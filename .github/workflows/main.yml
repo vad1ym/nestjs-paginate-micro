@@ -1,0 +1,33 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        mikro-orm: ['6.6.16', '7.2.2']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Select MikroORM 6 for compatibility run
+        if: matrix.mikro-orm == '6.6.16'
+        run: pnpm add -D @mikro-orm/core@6.6.16 @mikro-orm/postgresql@6.6.16 @mikro-orm/sqlite@6.6.16
+      - run: pnpm format:ci
+      - run: pnpm lint
+      - run: pnpm typecheck
+      - run: pnpm build
+      - run: pnpm test
+      - name: Smoke test both package entry points
+        run: |
+          node -e "if (typeof require('./dist/index.js').paginate !== 'function') process.exit(1)"
+          node --input-type=module -e "const m = await import('./dist/index.mjs'); if (typeof m.paginate !== 'function') process.exit(1)"

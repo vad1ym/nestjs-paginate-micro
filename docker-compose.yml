@@ -1,0 +1,19 @@
+services:
+  postgres:
+    container_name: postgres_nestjs_paginate
+    image: postgres:latest
+    environment:
+      POSTGRES_USER: root
+      POSTGRES_PASSWORD: pass
+      POSTGRES_DB: test
+    ports:
+      - "${POSTGRESS_DB_PORT:-5432}:5432"
+
+  mariadb:
+    container_name: mariadb_nestjs_paginate
+    image: mariadb:latest
+    environment:
+      MYSQL_ROOT_PASSWORD: pass
+      MYSQL_DATABASE: test
+    ports:
+      - "${MARIA_DB_PORT:-3306}:3306"

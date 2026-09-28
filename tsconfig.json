@@ -1,0 +1,16 @@
+{
+  "compilerOptions": {
+    "module": "commonjs",
+    "declaration": true,
+    "emitDecoratorMetadata": true,
+    "experimentalDecorators": true,
+    "allowSyntheticDefaultImports": true,
+    "target": "es2022",
+    "ignoreDeprecations": "6.0",
+    "sourceMap": true,
+    "outDir": "./dist",
+    "skipLibCheck": true, // https://stackoverflow.com/questions/55680391/typescript-error-ts2403-subsequent-variable-declarations-must-have-the-same-typ
+    "types": ["vitest/globals"]
+  },
+  "include": ["src"]
+}
