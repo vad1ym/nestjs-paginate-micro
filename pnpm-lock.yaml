@@ -18,6 +18,9 @@ importers:
       '@mikro-orm/core':
         specifier: ^7.2.2
         version: 7.2.2
+      '@mikro-orm/mysql':
+        specifier: ^7.2.2
+        version: 7.2.2(@mikro-orm/core@7.2.2)(@types/node@22.20.4)
       '@mikro-orm/postgresql':
         specifier: ^7.2.2
         version: 7.2.2(@mikro-orm/core@7.2.2)
@@ -332,6 +335,12 @@ packages:
     peerDependenciesMeta:
       dataloader:
         optional: true
+
+  '@mikro-orm/mysql@7.2.2':
+    resolution: {integrity: sha512-OyRnpMLnmKa4BBAWBkevrKQgtWdkwJ2AKBtmqoC+bCG60KGGQpi02w8N0fe1THjNi3qmtsgnp/NpCUM8TjPrpg==}
+    engines: {node: '>= 22.17.0'}
+    peerDependencies:
+      '@mikro-orm/core': 7.2.2
 
   '@mikro-orm/postgresql@7.2.2':
     resolution: {integrity: sha512-aVdTt3LeOGT7KRoPlazQwB/KgdF4w6EUL9bVCHVMg5/ERZPpJPJ/Ku29iBVnlBvvSKvxiMcyE56/354rgc2A7w==}
@@ -2077,6 +2086,10 @@ packages:
     resolution: {integrity: sha512-6CKD38c31SENivxOADeMNLdukOnUxUcflKtzVWzace7Riv1v7cAEym5Cx9Q7gYZ3ezIJI7ZpqecQq8cqNeSSFg==}
     engines: {bun: '>=1.0.0', deno: '>=2.0.0', node: '>=12.0.0'}
 
+  sqlstring@2.3.3:
+    resolution: {integrity: sha512-qC9iz2FlN7DQl3+wjwn3802RTyjCx7sDvfQEXchwa6CWOx07/WVfh91gBmQ9fahw8snwGEWU3xGzOt4tFyHLxg==}
+    engines: {node: '>= 0.6'}
+
   statuses@2.0.2:
     resolution: {integrity: sha512-DvEy55V3DB7uknRo+4iOGT5fP1slR8wQohVdknigZPMpMstaKJQWhwiYBACJE3Ul2pTnATihhBYnRhZQHGBiRw==}
     engines: {node: '>= 0.8'}
@@ -2530,6 +2543,16 @@ snapshots:
   '@microsoft/tsdoc@0.17.0': {}
 
   '@mikro-orm/core@7.2.2': {}
+
+  '@mikro-orm/mysql@7.2.2(@mikro-orm/core@7.2.2)(@types/node@22.20.4)':
+    dependencies:
+      '@mikro-orm/core': 7.2.2
+      '@mikro-orm/sql': 7.2.2(@mikro-orm/core@7.2.2)
+      kysely: 0.29.6
+      mysql2: 3.24.4(@types/node@22.20.4)
+      sqlstring: 2.3.3
+    transitivePeerDependencies:
+      - '@types/node'
 
   '@mikro-orm/postgresql@7.2.2(@mikro-orm/core@7.2.2)':
     dependencies:
@@ -4196,6 +4219,8 @@ snapshots:
   split2@4.2.0: {}
 
   sql-escaper@1.5.2: {}
+
+  sqlstring@2.3.3: {}
 
   statuses@2.0.2: {}
 

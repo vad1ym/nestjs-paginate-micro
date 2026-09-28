@@ -20,7 +20,7 @@
     "README.md",
     "dist/**/*"
   ],
-  "description": "nestjs-paginate compatible pagination for MikroORM repositories in NestJS.",
+  "description": "Filtering, search, sorting, and pagination for MikroORM in NestJS.",
   "keywords": [
     "nestjs",
     "mikro-orm",
@@ -41,6 +41,7 @@
   },
   "devDependencies": {
     "@mikro-orm/core": "^7.2.2",
+    "@mikro-orm/mysql": "^7.2.2",
     "@mikro-orm/postgresql": "^7.2.2",
     "@mikro-orm/sqlite": "^7.2.2",
     "@nestjs/common": "^12.1.1",

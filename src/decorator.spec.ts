@@ -225,10 +225,19 @@ describe('Decorator', () => {
         })
     })
 
-    it('should use default params if not valid values provided', () => {
+    it('rejects invalid page and limit values instead of silently changing the query', () => {
+        for (const value of ['NOTANUMBER', '2oops', '1.5', '0', '-2']) {
+            expect(() => decoratorfactory(null, fastifyContextFactory({ page: value }))).toThrow('Invalid page')
+        }
+        for (const value of ['NOTANUMBER', '2oops', '1.5', '-2']) {
+            expect(() => decoratorfactory(null, fastifyContextFactory({ limit: value }))).toThrow('Invalid limit')
+        }
+    })
+
+    it('keeps valid special limits and ignores unrelated query fields', () => {
         const context = fastifyContextFactory({
-            page: 'NOTANUMBER',
-            limit: 'NOTANUMBER',
+            page: '1',
+            limit: '-1',
             sortBy: ['NOTEXISTEN:BLABLA'],
             search: 'white',
             'filter.notUsed': '$fake:$eqaa:Kitty',
@@ -240,8 +249,8 @@ describe('Decorator', () => {
         const result: PaginateQuery = decoratorfactory(null, context)
 
         expect(result).toStrictEqual({
-            page: undefined,
-            limit: undefined,
+            page: 1,
+            limit: -1,
             sortBy: [['NOTEXISTEN', 'BLABLA']],
             search: 'white',
             searchBy: undefined,

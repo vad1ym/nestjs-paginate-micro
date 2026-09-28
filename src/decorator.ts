@@ -1,8 +1,7 @@
-import { createParamDecorator, ExecutionContext } from '@nestjs/common'
+import { BadRequestException, createParamDecorator, ExecutionContext } from '@nestjs/common'
 import type { Request as ExpressRequest } from 'express'
 import type { FastifyRequest } from 'fastify'
 import lodash, { type Dictionary } from 'lodash'
-import { isNil } from './helper'
 
 const { isString, mapKeys, pickBy } = lodash
 
@@ -56,17 +55,18 @@ function parseParam<T>(queryParam: unknown, parserLogic: (param: string, res: an
     return res.length ? res : undefined
 }
 
-function parseIntParam(v: unknown): number | undefined {
-    if (isNil(v)) {
-        return undefined
+function parseIntParam(value: unknown, name: 'page' | 'limit'): number | undefined {
+    if (value == null) return undefined
+    if (typeof value !== 'string' && typeof value !== 'number') {
+        throw new BadRequestException(`Invalid ${name}`)
     }
-
-    const result = Number.parseInt(v.toString(), 10)
-
-    if (Number.isNaN(result)) {
-        return undefined
+    const text = String(value)
+    if (!/^-?\d+$/.test(text)) throw new BadRequestException(`Invalid ${name}`)
+    const parsed = Number(text)
+    if (!Number.isSafeInteger(parsed) || (name === 'page' ? parsed < 1 : parsed < -1)) {
+        throw new BadRequestException(`Invalid ${name}`)
     }
-    return result
+    return parsed
 }
 
 export const Paginate = createParamDecorator((_data: unknown, ctx: ExecutionContext): PaginateQuery => {
@@ -109,15 +109,15 @@ export const Paginate = createParamDecorator((_data: unknown, ctx: ExecutionCont
         pickBy(
             query,
             (param, name) =>
-                name.includes('filter.') &&
+                name.startsWith('filter.') &&
                 (isString(param) || (Array.isArray(param) && (param as any[]).every((p) => isString(p))))
         ) as Dictionary<string | string[]>,
-        (_param, name) => name.replace('filter.', '')
+        (_param, name) => name.slice('filter.'.length)
     )
 
     return {
-        page: parseIntParam(query.page),
-        limit: parseIntParam(query.limit),
+        page: parseIntParam(query.page, 'page'),
+        limit: parseIntParam(query.limit, 'limit'),
         sortBy,
         search: query.search ? query.search.toString() : undefined,
         searchBy,

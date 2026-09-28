@@ -7,6 +7,11 @@ export type JoinMethod = 'leftJoinAndSelect' | 'innerJoinAndSelect'
 
 export const isNil = (value: unknown): value is null | undefined => value === null || value === undefined
 
+/** Translate nestjs-paginate's `relation.(embed.field)` spelling to MikroORM paths. */
+export function normalizeColumnPath(column: string): string {
+    return column.replace(/\.\(([^)]+)\)/g, '.$1')
+}
+
 export function positiveNumberOrDefault(value: number | undefined, fallback: number, minimum = 1): number {
     return Number.isFinite(value) && value! >= minimum ? value! : fallback
 }

@@ -7,10 +7,39 @@ on:
 jobs:
   verify:
     runs-on: ubuntu-latest
+    env:
+      PAGINATE_TEST_POSTGRES_URL: postgresql://postgres:test@127.0.0.1:5432/paginate_test
+      PAGINATE_TEST_MARIADB_URL: mysql://root:test@127.0.0.1:3306/paginate_test
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_PASSWORD: test
+          POSTGRES_DB: paginate_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      mariadb:
+        image: mariadb:11.4
+        env:
+          MARIADB_ROOT_PASSWORD: test
+          MARIADB_DATABASE: paginate_test
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd "healthcheck.sh --connect --innodb_initialized"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
     strategy:
       fail-fast: false
       matrix:
         mikro-orm: ['6.6.16', '7.2.2']
+        nestjs: ['11', '12']
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -21,7 +50,10 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - name: Select MikroORM 6 for compatibility run
         if: matrix.mikro-orm == '6.6.16'
-        run: pnpm add -D @mikro-orm/core@6.6.16 @mikro-orm/postgresql@6.6.16 @mikro-orm/sqlite@6.6.16
+        run: pnpm add -D @mikro-orm/core@6.6.16 @mikro-orm/postgresql@6.6.16 @mikro-orm/mysql@6.6.16 @mikro-orm/sqlite@6.6.16
+      - name: Select NestJS 11 for compatibility run
+        if: matrix.nestjs == '11'
+        run: pnpm add -D @nestjs/common@11 @nestjs/core@11 @nestjs/platform-express@11 @nestjs/swagger@11 @nestjs/testing@11
       - run: pnpm format:ci
       - run: pnpm lint
       - run: pnpm typecheck

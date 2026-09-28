@@ -47,6 +47,27 @@ describe('MikroORM filter translation', () => {
         })
     })
 
+    it('validates metadata-derived enum, UUID and date-only values', () => {
+        expect(
+            filterCondition('status', 'active', { status: true }, { status: { enum: ['active', 'disabled'] } })
+        ).toEqual({
+            status: { $eq: 'active' },
+        })
+        expect(filterCondition('level', '2', { level: true }, { level: { enum: [1, 2] } })).toEqual({
+            level: { $eq: 2 },
+        })
+        expect(filterCondition('day', '2026-01-31', { day: true }, { day: 'date-only' })).toEqual({
+            day: { $eq: '2026-01-31' },
+        })
+        expect(() => filterCondition('status', 'other', { status: true }, { status: { enum: ['active'] } })).toThrow(
+            'Invalid enum filter value'
+        )
+        expect(() => filterCondition('day', '2026-02-30', { day: true }, { day: 'date-only' })).toThrow(
+            'Invalid date filter value'
+        )
+        expect(() => filterCondition('id', 'bad', { id: true }, { id: 'uuid' })).toThrow('Invalid UUID filter value')
+    })
+
     it.each([
         ['missing', 'value', { column: true }, {}],
         ['column', '$gt:1', { column: [FilterOperator.EQ] }, {}],
@@ -57,13 +78,21 @@ describe('MikroORM filter translation', () => {
         ['column', 'yes', { column: true }, { column: 'boolean' }],
         ['column', 'not-a-date', { column: true }, { column: 'date' }],
     ])('rejects invalid filter %s=%s', (column, raw, allowed, kinds) => {
-        expect(() => filterCondition(column, raw, allowed as Parameters<typeof filterCondition>[2], kinds)).toThrow(
-            BadRequestException
-        )
+        expect(() =>
+            filterCondition(
+                column,
+                raw,
+                allowed as Parameters<typeof filterCondition>[2],
+                kinds as Parameters<typeof filterCondition>[3]
+            )
+        ).toThrow(BadRequestException)
     })
 
     it('accepts explicitly allow-listed negation', () => {
         expect(filterCondition('column', '$not:$eq:a', { column: [FilterOperator.EQ, FilterSuffix.NOT] })).toEqual({
+            column: { $not: { $eq: 'a' } },
+        })
+        expect(filterCondition('column', '$not:a', { column: ['$not'] })).toEqual({
             column: { $not: { $eq: 'a' } },
         })
     })

@@ -11,3 +11,4 @@ minimumReleaseAgeExclude:
   - '@nestjs/common@12.1.1'
   - '@nestjs/platform-express@12.1.1'
   - '@nestjs/testing@12.1.1'
+  - '@mikro-orm/mysql@7.2.2'
