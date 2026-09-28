@@ -274,3 +274,17 @@ pnpm lint && pnpm typecheck && pnpm test && pnpm build
 ```
 
 Optional live-DB tests use `PAGINATE_TEST_POSTGRES_URL` and `PAGINATE_TEST_MARIADB_URL` and recreate their dedicated schemas. CI covers MikroORM 6.6/7.2 with NestJS 11/12. CockroachDB selects the PostgreSQL dialect but is not in the live-DB test matrix. For another SQL driver, extend `SqlDialect` and pass an instance through `dialect`.
+
+## Releases
+
+The first npm publish must be done from an authenticated local session; the package must exist before npm can configure its GitHub Actions trusted publisher:
+
+```sh
+npm login
+pnpm build
+npm publish --access public
+```
+
+After npm shows `1.0.0`, configure Trusted Publishing for `vad1ym/nestjs-paginate-micro` and workflow `publish.yml` with direct `npm publish` allowed. Then create and push the tag with `git tag -a v1.0.0 -m v1.0.0` and `git push origin main v1.0.0`; the tag workflow skips an already-published version.
+
+For later releases, use Conventional Commits, preview with `pnpm changelog:dry`, then run `pnpm release` and `git push origin main --follow-tags`. `changelogen` updates the changelog and creates the version commit/tag; pushing the tag starts the publish workflow. Do not use `pnpm release` for the already-set initial `1.0.0` version.
