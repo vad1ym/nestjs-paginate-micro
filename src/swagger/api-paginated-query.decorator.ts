@@ -20,7 +20,7 @@ function li(key: string | 'Available Fields', values: string[]) {
 ${values.map((v) => `- ${v}`).join('\n\n')}`
 }
 
-export function SortBy(paginationConfig: PaginateConfig<any>) {
+export function SortBy(paginationConfig: PaginateConfig<any, any>) {
     const sortableColumnNotAvailable =
         isNil(paginationConfig.sortableColumns) || paginationConfig.sortableColumns.length === 0
 
@@ -60,7 +60,7 @@ ${li('Available Fields', paginationConfig.sortableColumns)}
     })
 }
 
-export function Limit(paginationConfig: PaginateConfig<any>) {
+export function Limit(paginationConfig: PaginateConfig<any, any>) {
     return ApiQuery({
         name: 'limit',
         description: `Number of records per page.
@@ -78,7 +78,7 @@ If provided value is greater than max value, max value will be applied.
     })
 }
 
-export function Select(paginationConfig: PaginateConfig<any>) {
+export function Select(paginationConfig: PaginateConfig<any, any>) {
     if (!paginationConfig.select) {
         return
     }
@@ -97,7 +97,7 @@ ${p(
     })
 }
 
-export function Where(paginationConfig: PaginateConfig<any>) {
+export function Where(paginationConfig: PaginateConfig<any, any>) {
     if (!paginationConfig.filterableColumns) return
 
     const allColumnsDecorators = Object.entries(paginationConfig.filterableColumns)
@@ -147,7 +147,7 @@ ${p(DEFAULT_VALUE_KEY, '1')}
     })
 }
 
-export function Search(paginateConfig: PaginateConfig<any>) {
+export function Search(paginateConfig: PaginateConfig<any, any>) {
     if (!paginateConfig.searchableColumns) return
 
     return ApiQuery({
@@ -161,7 +161,7 @@ ${p(DEFAULT_VALUE_KEY, 'No default value')}
     })
 }
 
-export function SearchBy(paginateConfig: PaginateConfig<any>) {
+export function SearchBy(paginateConfig: PaginateConfig<any, any>) {
     if (!paginateConfig.searchableColumns) return
 
     return ApiQuery({
@@ -180,7 +180,7 @@ ${li('Available Fields', paginateConfig.searchableColumns)}
     })
 }
 
-export function WithDeleted(paginateConfig: PaginateConfig<any>) {
+export function WithDeleted(paginateConfig: PaginateConfig<any, any>) {
     if (!paginateConfig.allowWithDeletedInQuery) return
 
     return ApiQuery({
@@ -191,7 +191,7 @@ export function WithDeleted(paginateConfig: PaginateConfig<any>) {
     })
 }
 
-export const ApiPaginationQuery = (paginationConfig: PaginateConfig<any>) => {
+export const ApiPaginationQuery = (paginationConfig: PaginateConfig<any, any>) => {
     const decorators = [
         Page(),
         Limit(paginationConfig),

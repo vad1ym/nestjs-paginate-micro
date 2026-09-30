@@ -1,5 +1,5 @@
 import { BadRequestException, ServiceUnavailableException } from '@nestjs/common'
-import { FilterQuery, LoadStrategy, raw } from '@mikro-orm/core'
+import { FilterQuery, LoadStrategy, raw, Utils } from '@mikro-orm/core'
 import { PaginateQuery } from './decorator'
 import {
     FilterOperator,
@@ -53,7 +53,7 @@ export enum PaginationLimit {
     COUNTER_ONLY = 0,
 }
 
-export interface PaginateConfig<T extends object> {
+export interface PaginateConfig<T extends object, Context extends object = Record<string, unknown>> {
     sortableColumns: Column<T>[]
     searchableColumns?: Column<T>[]
     filterableColumns?: Partial<MappedColumns<T, FilterOption[] | true>>
@@ -77,6 +77,8 @@ export interface PaginateConfig<T extends object> {
     filterValueTypes?: Partial<Record<Column<T>, FilterValueType>>
     /** Override SQL syntax for a custom driver. */
     dialect?: SqlDialect
+    /** Resolve public columns to SQL expressions for the current request context. */
+    fieldResolvers?: Partial<Record<Column<T>, FieldResolver<T, Context>>>
     /** Use MikroORM's separate relation loading for stable root entity pages. */
     loadStrategy?: LoadStrategy
     /** Kept for source compatibility; unsupported join strategy choices are rejected. */
@@ -91,6 +93,21 @@ export interface PaginateConfig<T extends object> {
     /** Override a MikroORM count query; unlike TypeORM this callback receives a MikroORM builder. */
     buildCountQuery?: (queryBuilder: MikroQueryBuilder<T>) => MikroQueryBuilder<T>
 }
+
+export interface LocalizedTextQueryProxy {
+    get(locale: string): QueryExpression
+    all(): QueryExpression[]
+}
+
+export type QueryExpression = symbol
+export type QueryProxy<T extends object> = { [K in keyof T]: LocalizedTextQueryProxy }
+export type FieldResolver<T extends object, Context extends object = Record<string, unknown>> =
+    | ((entity: QueryProxy<T>, context: Context) => QueryExpression | QueryExpression[])
+    | {
+          sort?: (entity: QueryProxy<T>, context: Context) => QueryExpression
+          search?: (entity: QueryProxy<T>, context: Context) => QueryExpression | QueryExpression[]
+          filter?: (entity: QueryProxy<T>, context: Context) => QueryExpression
+      }
 
 /** A small structural contract for MikroORM QueryBuilder inputs. */
 export interface MikroQueryBuilder<T extends object> {
@@ -204,6 +221,67 @@ function jsonColumn(metadata: any, column: string): { relations: string[]; field
     return undefined
 }
 
+function localizedTextExpression(metadata: any, column: string, locale: string, platform: any): QueryExpression {
+    const property = metadata?.properties?.[column]
+    const locales = property?.targetMeta?.properties
+    if (property?.kind !== 'embedded' || !locales || !Object.hasOwn(locales, locale)) {
+        throw new BadRequestException(`Unknown localized field or locale: ${column}.${locale}`)
+    }
+    if (!String(platform?.constructor?.name).toLowerCase().includes('postgres')) {
+        throw new BadRequestException('Localized field resolvers currently require PostgreSQL')
+    }
+
+    const field = property.fieldNames?.[0] ?? column
+    const requestedLocales = locale === 'en' || !Object.hasOwn(locales, 'en') ? [locale] : [locale, 'en']
+    const quote = (value: string) => platform.quoteIdentifier(value)
+    const literal = (value: string) => `'${value.replaceAll("'", "''")}'`
+
+    return raw((alias) => {
+        const reference = `${quote(alias)}.${quote(field)}`
+        const values = requestedLocales.map((item) => {
+            const value = `${reference} ->> ${literal(item)}`
+            return `CASE WHEN NULLIF(BTRIM(${value}), '') IS NOT NULL THEN ${value} END`
+        })
+        return values.length === 1 ? values[0] : `COALESCE(${values.join(', ')})`
+    })
+}
+
+function localizedTextProxy<T extends object>(metadata: any, platform: any): QueryProxy<T> {
+    return new Proxy(
+        {},
+        {
+            get: (_target, property) => {
+                const name = String(property)
+                const locales = metadata?.properties?.[name]?.targetMeta?.properties
+                if (!locales) return undefined
+
+                return {
+                    get: (locale: string) => localizedTextExpression(metadata, name, locale, platform),
+                    all: () =>
+                        Object.keys(locales).map((locale) => localizedTextExpression(metadata, name, locale, platform)),
+                }
+            },
+        }
+    ) as QueryProxy<T>
+}
+
+function replaceConditionKey<T extends object>(
+    condition: any,
+    placeholder: string,
+    expression: QueryExpression
+): FilterQuery<T> {
+    if (Array.isArray(condition))
+        return condition.map((item) => replaceConditionKey(item, placeholder, expression)) as any
+    if (!Utils.isPlainObject(condition)) return condition
+
+    return Object.fromEntries(
+        Object.entries(condition).map(([key, value]) => [
+            key === placeholder ? expression : key,
+            replaceConditionKey(value, placeholder, expression),
+        ])
+    ) as FilterQuery<T>
+}
+
 function joinToOneRelations<T extends object>(
     input: MikroQueryBuilder<T>,
     metadata: any,
@@ -248,9 +326,9 @@ function polymorphicColumnSql<T extends object>(
     return `${platform.quoteIdentifier(alias)}.${platform.quoteIdentifier(leaf.fieldNames?.[0] ?? leaf.name)}`
 }
 
-function encodeLinks<T extends object>(
+function encodeLinks<T extends object, Context extends object>(
     query: PaginateQuery,
-    config: PaginateConfig<T>,
+    config: PaginateConfig<T, Context>,
     limit: number,
     sortBy: SortBy<T>,
     searchBy: Column<T>[],
@@ -293,10 +371,11 @@ function encodeLinks<T extends object>(
 }
 
 /** Apply a nestjs-paginate query to a MikroORM repository or query builder. */
-export async function paginate<T extends object>(
+export async function paginate<T extends object, Context extends object = Record<string, unknown>>(
     query: PaginateQuery,
     input: MikroRepository<T> | MikroQueryBuilder<T>,
-    config: PaginateConfig<T>
+    config: PaginateConfig<T, Context>,
+    runtimeContext: Context = {} as Context
 ): Promise<Paginated<T>> {
     if (!config.sortableColumns?.length)
         throw new ServiceUnavailableException("Missing required 'sortableColumns' config.")
@@ -371,7 +450,7 @@ export async function paginate<T extends object>(
     }
     if (repo && (polymorphicSort || polymorphicFilter || relationJsonSort)) {
         if (!input.createQueryBuilder) throw new BadRequestException('Polymorphic columns require a SQL repository')
-        const result = await paginate(query, input.createQueryBuilder('__root'), config)
+        const result = await paginate(query, input.createQueryBuilder('__root'), config, runtimeContext)
         const relations = relationPaths(config.relations as string[] | Record<string, unknown>)
         if (relations.length) {
             await (input.getEntityManager() as any).populate(result.data, relations)
@@ -389,6 +468,24 @@ export async function paginate<T extends object>(
         : (input as any).driver?.getPlatform()
     const dialect = config.dialect ?? dialectFor(platform?.constructor.name ?? '')
     const searchOperator = dialect.caseInsensitiveOperator
+    const queryProxy = localizedTextProxy<T>(entityPaths.metadata, platform)
+    const resolveField = (
+        column: string,
+        operation: 'sort' | 'search' | 'filter'
+    ): QueryExpression | QueryExpression[] | undefined => {
+        const resolver = config.fieldResolvers?.[column as Column<T>]
+        if (!resolver) return undefined
+        if (typeof resolver === 'function') return resolver(queryProxy, runtimeContext)
+        return resolver[operation]?.(queryProxy, runtimeContext)
+    }
+
+    if (
+        config.paginationType === PaginationType.CURSOR &&
+        sortBy.some(([column]) => typeof column === 'string' && config.fieldResolvers?.[column as Column<T>])
+    ) {
+        throw new BadRequestException('Field resolver sorting requires offset pagination')
+    }
+
     if (config.where) {
         conditions.push(Array.isArray(config.where) ? ({ $or: config.where } as FilterQuery<T>) : config.where)
     }
@@ -405,7 +502,22 @@ export async function paginate<T extends object>(
     const isAllowed = (column: string) =>
         column in allowed || (column.includes('~') && column.split('~').every((part) => part in allowed))
     const makeFilterCondition = (column: string, value: string): FilterQuery<T> => {
+        if (!isAllowed(column)) throw new BadRequestException(`Column '${column}' is not filterable`)
         if (!column.includes('~')) {
+            const expression = resolveField(column, 'filter')
+            if (expression && !Array.isArray(expression)) {
+                const placeholder = '__paginate_resolved_field'
+                const condition = filterCondition<Record<string, unknown>>(
+                    placeholder,
+                    value,
+                    { [placeholder]: allowed[column] },
+                    { [placeholder]: kinds[column] },
+                    new Set(),
+                    searchOperator
+                )
+                return replaceConditionKey<T>(condition, placeholder, expression)
+            }
+
             return filterCondition<T>(column, value, allowed, kinds, entityPaths.collections, searchOperator)
         }
         const parts = column.split('~')
@@ -471,13 +583,36 @@ export async function paginate<T extends object>(
         const words = config.multiWordSearch ? query.search.split(/\s+/).filter(Boolean) : [query.search]
         for (const word of words) {
             conditions.push({
-                $or: searchBy.map((column) => pathCondition<T>(String(column), { [searchOperator]: `%${word}%` })),
+                $or: searchBy.flatMap((column) => {
+                    const expression = resolveField(String(column), 'search')
+                    const expressions =
+                        expression === undefined ? [] : Array.isArray(expression) ? expression : [expression]
+                    return expressions.length
+                        ? expressions.map((item) => ({ [item]: { [searchOperator]: `%${word}%` } }) as FilterQuery<T>)
+                        : [pathCondition<T>(String(column), { [searchOperator]: `%${word}%` })]
+                }),
             } as FilterQuery<T>)
         }
     }
     const where = conditions.length ? ({ $and: conditions } as FilterQuery<T>) : ({} as FilterQuery<T>)
     const orderBy = Object.fromEntries(
         sortBy.flatMap(([column, direction]) => {
+            if (!Array.isArray(column)) {
+                const expression = resolveField(String(column), 'sort')
+                if (expression) {
+                    if (Array.isArray(expression))
+                        throw new BadRequestException('Sort resolver must return one expression')
+                    if (config.nullSort) {
+                        const sql = (expression as unknown as { sql?: string }).sql
+                        if (!sql) throw new BadRequestException('nullSort requires a SQL-backed field resolver')
+                        return dialect
+                            .nullSort(sql, direction, config.nullSort)
+                            .map(([fragment, order]) => [raw(fragment), order])
+                    }
+                    return [[expression, direction]]
+                }
+            }
+
             if (Array.isArray(column)) {
                 const expression = dialect.coalesce(
                     column.map((part) =>

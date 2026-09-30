@@ -108,6 +108,27 @@ URL-encode spaces and parentheses in actual requests. Expression fields use the 
 
 MikroORM entity metadata supplies number, boolean, `Date`, date-only, UUID, and enum value types, so invalid values return 400 without per-field parsers. Override ambiguous metadata with `filterValueTypes: { publishedOn: 'date-only' }`. Unknown/invalid filters return 400 by default; `throwOnInvalidFilter: false` restores ignore behavior.
 
+Use `fieldResolvers` to map an allowed column to a computed SQL expression. For example, apply `LOWER()` to an article's title when sorting, searching, and filtering:
+
+```ts
+import { raw } from '@mikro-orm/core'
+import type { PaginateConfig } from 'nestjs-paginate-micro'
+import { Article } from './article.entity'
+
+const config = {
+  sortableColumns: ['title', 'createdAt'],
+  searchableColumns: ['title'],
+  filterableColumns: { title: ['$ilike', '$sw', '$null'] },
+  fieldResolvers: {
+    title: () => raw((alias) => `LOWER(${alias}.title)`),
+  },
+} satisfies PaginateConfig<Article>
+
+return paginate(query, this.articles, config)
+```
+
+A resolver function applies to all three operations. Use an object with `sort`, `search`, and `filter` callbacks to provide separate expressions; a search callback can return several expressions. Resolvers keep the public column (`title`) in query parameters and metadata, and filters still require an entry in `filterableColumns`. Pass request-specific values as the fourth `paginate()` argument; callbacks receive them as their second argument. Cursor pagination rejects sorting through a field resolver until expression-aware cursors are supported.
+
 ## Relations, JSON, and scoped queries
 
 Use MikroORM property paths in allow-lists. `relations` populates the returned entities; a path can also be filtered without being populated.

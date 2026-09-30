@@ -1,4 +1,4 @@
-import { Collection, EntitySchema } from '@mikro-orm/core'
+import { Collection, EntitySchema, raw } from '@mikro-orm/core'
 import { MikroORM } from '@mikro-orm/sqlite'
 import type { EntityRepository, SelectQueryBuilder } from '@mikro-orm/postgresql'
 import { FilterOperator, FilterQuantifier, paginate, PaginateConfig, PaginationType } from './paginate'
@@ -144,6 +144,30 @@ describe('MikroORM pagination', () => {
                 config
             )
         ).rejects.toThrow()
+    })
+
+    it('rejects expression filters for resolver fields outside the allow-list', async () => {
+        const resolver = vi.fn(() => raw('first_name'))
+        await expect(
+            paginate({ path: null, filterExpression: 'firstName=$eq:Alice' }, orm.em.getRepository(Doctor), {
+                ...config,
+                fieldResolvers: { firstName: resolver },
+            })
+        ).rejects.toThrow("Column 'firstName' is not filterable")
+        expect(resolver).not.toHaveBeenCalled()
+    })
+
+    it.each([
+        ['$eq:2026-01-02', [2]],
+        ['$btw:2026-01-02,2026-01-03', [3, 2]],
+        ['$in:2026-01-01,2026-01-03', [3, 1]],
+    ])('preserves typed date values in resolved filters: %s', async (value, ids) => {
+        const result = await paginate({ path: null, filter: { createdAt: value } }, orm.em.getRepository(Doctor), {
+            ...config,
+            filterableColumns: { createdAt: true },
+            fieldResolvers: { createdAt: { filter: () => raw((alias) => `${alias}.created_at`) } },
+        })
+        expect(result.data.map((row) => row.id)).toEqual(ids)
     })
 
     it('supports MikroORM cursor pages', async () => {

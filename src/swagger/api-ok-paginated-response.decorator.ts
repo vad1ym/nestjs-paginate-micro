@@ -7,7 +7,7 @@ import { PaginatedDocumented } from './paginated-swagger.type'
 export const ApiOkPaginatedResponse = <DTO extends Type<unknown> | string>(
     dataDto: DTO,
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    paginatedConfig: PaginateConfig<any>
+    paginatedConfig: PaginateConfig<any, any>
 ) => {
     const cols = paginatedConfig?.filterableColumns || {}
 

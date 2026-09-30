@@ -5,7 +5,7 @@ import { ApiOkPaginatedResponse } from './api-ok-paginated-response.decorator'
 
 export function PaginatedSwaggerDocs<DTO extends Type<unknown> | string>(
     dto: DTO,
-    paginatedConfig: PaginateConfig<any>
+    paginatedConfig: PaginateConfig<any, any>
 ) {
     return applyDecorators(ApiOkPaginatedResponse(dto, paginatedConfig), ApiPaginationQuery(paginatedConfig))
 }

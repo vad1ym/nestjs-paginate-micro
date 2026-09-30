@@ -138,12 +138,14 @@ export class PaginatedDocumented<T> extends Paginated<T> {
     @ApiProperty({
         title: 'Pagination Metadata',
         required: true,
+        type: () => PaginatedMetaDocumented,
     })
     declare meta: PaginatedMetaDocumented<T>
 
     @ApiProperty({
         title: 'Links to pages',
         required: true,
+        type: () => PaginatedLinksDocumented,
     })
     declare links: PaginatedLinksDocumented
 }
