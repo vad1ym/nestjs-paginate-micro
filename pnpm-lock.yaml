@@ -18,9 +18,6 @@ importers:
       '@mikro-orm/core':
         specifier: ^7.2.2
         version: 7.2.2
-      '@mikro-orm/decorators':
-        specifier: 7.2.2
-        version: 7.2.2(@mikro-orm/core@7.2.2)(reflect-metadata@0.2.2)
       '@mikro-orm/mysql':
         specifier: ^7.2.2
         version: 7.2.2(@mikro-orm/core@7.2.2)(@types/node@22.20.4)
@@ -340,16 +337,6 @@ packages:
       dataloader: 2.2.3
     peerDependenciesMeta:
       dataloader:
-        optional: true
-
-  '@mikro-orm/decorators@7.2.2':
-    resolution: {integrity: sha512-Qm5T+o6iFIGajXavNg+54My0SivbtXvATMR7YtxTet3wPwvBRxqCOfASHFAK5GjTJ9XQVCJEdJldBLLU4qqVGg==}
-    engines: {node: '>= 22.17.0'}
-    peerDependencies:
-      '@mikro-orm/core': 7.2.2
-      reflect-metadata: ^0.1.0 || ^0.2.0
-    peerDependenciesMeta:
-      reflect-metadata:
         optional: true
 
   '@mikro-orm/mysql@7.2.2':
@@ -2679,12 +2666,6 @@ snapshots:
   '@microsoft/tsdoc@0.17.0': {}
 
   '@mikro-orm/core@7.2.2': {}
-
-  '@mikro-orm/decorators@7.2.2(@mikro-orm/core@7.2.2)(reflect-metadata@0.2.2)':
-    dependencies:
-      '@mikro-orm/core': 7.2.2
-    optionalDependencies:
-      reflect-metadata: 0.2.2
 
   '@mikro-orm/mysql@7.2.2(@mikro-orm/core@7.2.2)(@types/node@22.20.4)':
     dependencies:

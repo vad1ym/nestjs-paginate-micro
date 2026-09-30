@@ -1,26 +1,34 @@
 import { EntitySchema } from '@mikro-orm/core'
-import { Embeddable, Embedded, Entity, PrimaryKey, Property } from '@mikro-orm/decorators/legacy'
 import { MikroORM as PostgreSqlORM } from '@mikro-orm/postgresql'
 import { MikroORM as MySqlORM } from '@mikro-orm/mysql'
 import { FilterOperator, paginate, type PaginateConfig } from './paginate'
 
-@Embeddable()
 class LocalizedValue {
-    @Property({ type: 'string', nullable: true })
     en: string | null = null
-
-    @Property({ type: 'string', nullable: true })
     es: string | null = null
 }
 
-@Entity({ tableName: 'localized_pagination_records' })
 class LocalizedRecord {
-    @PrimaryKey({ type: 'number' })
     id!: number
-
-    @Embedded(() => LocalizedValue, { object: true })
     title = new LocalizedValue()
 }
+
+const LocalizedValueSchema = new EntitySchema<LocalizedValue>({
+    class: LocalizedValue,
+    embeddable: true,
+    properties: {
+        en: { type: 'string', nullable: true },
+        es: { type: 'string', nullable: true },
+    },
+})
+const LocalizedRecordSchema = new EntitySchema<LocalizedRecord>({
+    class: LocalizedRecord,
+    tableName: 'localized_pagination_records',
+    properties: {
+        id: { type: 'number', primary: true },
+        title: { kind: 'embedded', entity: () => LocalizedValue, object: true },
+    },
+})
 
 class DialectArticle {
     id!: number
@@ -131,10 +139,12 @@ for (const [name, url, driver] of [
 
 const postgresUrl = process.env.PAGINATE_TEST_POSTGRES_URL
 it('discovers localized entity metadata without a database connection', async () => {
-    const orm = await PostgreSqlORM.init({
+    const options = {
         dbName: 'paginate_metadata_test',
-        entities: [LocalizedRecord],
-    })
+        entities: [LocalizedRecordSchema, LocalizedValueSchema],
+        connect: false,
+    }
+    const orm = await PostgreSqlORM.init(options)
     try {
         expect(orm.getMetadata().get(LocalizedRecord).properties.title.targetMeta!.properties.en.type).toBe('string')
     } finally {
@@ -149,7 +159,7 @@ describe.skipIf(!postgresUrl)('PostgreSQL localized field resolvers', () => {
         orm = await PostgreSqlORM.init({
             clientUrl: postgresUrl!,
             schema: `paginate_localized_${process.pid}`,
-            entities: [LocalizedRecord],
+            entities: [LocalizedRecordSchema, LocalizedValueSchema],
             allowGlobalContext: true,
         })
         if (orm.schema?.create) await orm.schema.create()
@@ -189,7 +199,8 @@ describe.skipIf(!postgresUrl)('PostgreSQL localized field resolvers', () => {
         const path = 'http://localhost/localized-records'
 
         const sorted = await paginate({ path }, repository, config, { locale: 'es' })
-        expect(sorted.data.map((row) => row.id)).toEqual([2, 3, 1])
+        // Spanish translation or English fallback: Beta, Consulta breve, Gamma.
+        expect(sorted.data.map((row) => row.id)).toEqual([2, 1, 3])
 
         const searched = await paginate({ path, search: 'Consulta' }, repository, config, { locale: 'es' })
         expect(searched.data.map((row) => row.id)).toEqual([1])
